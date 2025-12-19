@@ -1,0 +1,3 @@
+torch
+python-telegram-bot
+scikit-learn
