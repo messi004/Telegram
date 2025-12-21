@@ -37,27 +37,40 @@ async def tag_all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status_msg = await update.message.reply_text("🔄 Fetching members...")
     
     try:
-        # Get all chat members
         chat_id = update.effective_chat.id
-        members = []
+        
+        # Get chat member count
         member_count = await context.bot.get_chat_member_count(chat_id)
         
-        # Update status
-        await status_msg.edit_text(f"🔄 Found {member_count} members. Tagging...")
+        # Get administrators (these we can always access)
+        administrators = await context.bot.get_chat_administrators(chat_id)
         
-        # Fetch all members (this might take time for large groups)
-        async for member in context.bot.get_chat_administrators(chat_id):
-            if not member.user.is_bot:
-                members.append(member.user)
+        # Filter out bots
+        members = [admin.user for admin in administrators if not admin.user.is_bot]
         
-        # Get regular members (Telegram API limitation - we'll tag visible members)
-        # Note: Full member list requires special permissions
+        # Add recently active members from tracking
+        if 'recent_members' in context.bot_data:
+            recent = context.bot_data['recent_members'].get(chat_id, [])
+            for user_id, username, first_name in recent:
+                # Check if not already in members list
+                if not any(m.id == user_id for m in members):
+                    # Create a simple user object
+                    class SimpleUser:
+                        def __init__(self, uid, uname, fname):
+                            self.id = uid
+                            self.username = uname
+                            self.first_name = fname
+                    members.append(SimpleUser(user_id, username, first_name))
         
         if not members:
             await status_msg.edit_text("❌ No members found to tag!")
             return
         
+        # Update status
+        await status_msg.edit_text(f"🔄 Tagging {len(members)} members...")
+        
         # Delete status message
+        await asyncio.sleep(1)
         await status_msg.delete()
         
         # Send message with tags
@@ -65,11 +78,12 @@ async def tag_all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     except Exception as e:
         await status_msg.edit_text(f"❌ Error: {str(e)}")
+        print(f"Error in tag_all_command: {e}")
 
 async def send_mass_tag_message(update, context, members, custom_message):
     """Send message with member tags in batches"""
     # Telegram limit: 4096 characters per message
-    MAX_TAGS_PER_MESSAGE = 10  # Approximately 10 tags per message
+    MAX_TAGS_PER_MESSAGE = 50  # Approximately 50 tags per message
     
     total_members = len(members)
     batches = [members[i:i + MAX_TAGS_PER_MESSAGE] for i in range(0, len(members), MAX_TAGS_PER_MESSAGE)]
@@ -80,11 +94,17 @@ async def send_mass_tag_message(update, context, members, custom_message):
         message += "👥 Tagged Members:\n"
         
         for member in batch:
-            if member.username:
-                message += f"@{member.username} "
-            else:
-                # Use text mention for users without username
-                message += f"[{member.first_name}](tg://user?id={member.id}) "
+            try:
+                if hasattr(member, 'username') and member.username:
+                    message += f"@{member.username} "
+                else:
+                    # Use text mention for users without username
+                    fname = getattr(member, 'first_name', 'User')
+                    uid = getattr(member, 'id', 0)
+                    message += f"[{fname}](tg://user?id={uid}) "
+            except Exception as e:
+                print(f"Error tagging member: {e}")
+                continue
         
         # Send message
         try:
@@ -96,7 +116,7 @@ async def send_mass_tag_message(update, context, members, custom_message):
             
             # Add delay between batches to avoid flood limits
             if batch_num < len(batches):
-                await asyncio.sleep(2)
+                await asyncio.sleep(1)
         except Exception as e:
             print(f"Error sending batch {batch_num}: {e}")
 
@@ -141,10 +161,14 @@ async def tagall_admins_command(update: Update, context: ContextTypes.DEFAULT_TY
         message += "👥 Tagged Admins:\n"
         
         for admin in admin_list:
-            if admin.username:
-                message += f"@{admin.username} "
-            else:
-                message += f"[{admin.first_name}](tg://user?id={admin.id}) "
+            try:
+                if admin.username:
+                    message += f"@{admin.username} "
+                else:
+                    message += f"[{admin.first_name}](tg://user?id={admin.id}) "
+            except Exception as e:
+                print(f"Error tagging admin: {e}")
+                continue
         
         # Send message
         await context.bot.send_message(
@@ -155,6 +179,7 @@ async def tagall_admins_command(update: Update, context: ContextTypes.DEFAULT_TY
         
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {str(e)}")
+        print(f"Error in tagall_admins_command: {e}")
 
 async def tagall_online_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -201,10 +226,14 @@ async def tagall_online_command(update: Update, context: ContextTypes.DEFAULT_TY
     message += "👥 Active Members:\n"
     
     for user_id, username, first_name in recent_members[-50:]:  # Last 50 active
-        if username:
-            message += f"@{username} "
-        else:
-            message += f"[{first_name}](tg://user?id={user_id}) "
+        try:
+            if username:
+                message += f"@{username} "
+            else:
+                message += f"[{first_name}](tg://user?id={user_id}) "
+        except Exception as e:
+            print(f"Error tagging member: {e}")
+            continue
     
     try:
         await context.bot.send_message(
@@ -214,28 +243,38 @@ async def tagall_online_command(update: Update, context: ContextTypes.DEFAULT_TY
         )
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {str(e)}")
+        print(f"Error in tagall_online_command: {e}")
 
 async def track_active_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Track recently active members (call this from message handler)"""
     if update.effective_chat.type == "private":
         return
     
-    if 'recent_members' not in context.bot_data:
-        context.bot_data['recent_members'] = {}
-    
-    chat_id = update.effective_chat.id
-    if chat_id not in context.bot_data['recent_members']:
-        context.bot_data['recent_members'][chat_id] = []
-    
-    user = update.effective_user
-    user_info = (user.id, user.username, user.first_name)
-    
-    # Add to recent members (keep last 100)
-    recent = context.bot_data['recent_members'][chat_id]
-    if user_info not in recent:
+    try:
+        if 'recent_members' not in context.bot_data:
+            context.bot_data['recent_members'] = {}
+        
+        chat_id = update.effective_chat.id
+        if chat_id not in context.bot_data['recent_members']:
+            context.bot_data['recent_members'][chat_id] = []
+        
+        user = update.effective_user
+        user_info = (user.id, user.username, user.first_name)
+        
+        # Add to recent members (keep last 100)
+        recent = context.bot_data['recent_members'][chat_id]
+        
+        # Remove if already exists (to move to end)
+        recent = [m for m in recent if m[0] != user.id]
         recent.append(user_info)
+        
+        # Keep only last 100
         if len(recent) > 100:
-            recent.pop(0)
+            recent = recent[-100:]
+        
+        context.bot_data['recent_members'][chat_id] = recent
+    except Exception as e:
+        print(f"Error tracking member: {e}")
 
 async def tagall_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show tagging statistics"""
@@ -265,9 +304,12 @@ Recently Active: {recent_count}
 /tagadmins - Tag only admins
 /tagonline - Tag recently active members
 /tagstats - This statistics
+
+*Note:* Due to Telegram limitations, /tagall can only tag admins and recently active members.
         """
         
         await update.message.reply_text(stats_msg, parse_mode='Markdown')
         
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {str(e)}")
+        print(f"Error in tagall_stats_command: {e}")

@@ -12,7 +12,7 @@ DEFAULT_WELCOME = """
 ✅ No spam
 ✅ No adult content
 ✅ No external links
-✅ No @mentions spam
+✅ No mentions spam
 
 🤖 I keep the group clean!
 
@@ -22,7 +22,7 @@ Enjoy! 😊
 START_MESSAGE = """
 🤖 *Ultra Advanced Spam Detector Bot*
 
-*🆕 Auto-Ban System (3-Strike):*
+*Auto-Ban System (3-Strike):*
 ✅ 3 strikes → Permanent ban
 ✅ Strike tracking per user
 ✅ Auto-reset after 24 hours
@@ -84,6 +84,12 @@ HELP_MESSAGE = """
 *Custom Welcome:*
 /customwelcome <message> - Set custom
 /resetwelcome - Reset to default
+
+*Tag members with custom message:*
+/tagall - Tag all members
+/tagadmins - Tag only admins
+/tagonline - Tag recently active members
+/tagstats - Tag statistics
 
 *Info:*
 /stats - Bot statistics
