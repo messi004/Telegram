@@ -257,36 +257,41 @@ async def reportspam_command(update: Update, context: ContextTypes.DEFAULT_TYPE,
 
 async def learningstats_command(update: Update, context: ContextTypes.DEFAULT_TYPE, smart_learning):
     """Show learning statistics"""
-    stats_msg = f"""
-🧠 *Smart Learning Statistics*
-
-*Learned Patterns:*
-Spam Keywords: {len(smart_learning.learned_spam_patterns)}
-Safe Keywords: {len(smart_learning.learned_safe_patterns)}
-
-*User Feedback:*
-False Positives: {len(smart_learning.false_positives)}
-False Negatives: {len(smart_learning.false_negatives)}
-
-*Top Learned Spam Keywords:*
-"""
+    
+    # Escape special characters for Markdown
+    def escape_markdown(text):
+        """Escape special markdown characters"""
+        special_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+        for char in special_chars:
+            text = text.replace(char, f'\\{char}')
+        return text
+    
+    stats_msg = "🧠 *Smart Learning Statistics*\n\n"
+    stats_msg += "*Learned Patterns:*\n"
+    stats_msg += f"Spam Keywords: {len(smart_learning.learned_spam_patterns)}\n"
+    stats_msg += f"Safe Keywords: {len(smart_learning.learned_safe_patterns)}\n\n"
+    
+    stats_msg += "*User Feedback:*\n"
+    stats_msg += f"False Positives: {len(smart_learning.false_positives)}\n"
+    stats_msg += f"False Negatives: {len(smart_learning.false_negatives)}\n\n"
+    
+    stats_msg += "*Top Learned Spam Keywords:*\n"
     
     learned = smart_learning.get_learned_keywords()
     if learned:
         for i, keyword in enumerate(learned[:10], 1):
-            stats_msg += f"{i}. {keyword}\n"
+            # Escape the keyword for Markdown
+            safe_keyword = escape_markdown(keyword)
+            stats_msg += f"{i}\\. {safe_keyword}\n"
     else:
-        stats_msg += "None yet - bot is still learning!\n"
+        stats_msg += "None yet \\- bot is still learning\\!\n"
     
-    stats_msg += """
-*How It Works:*
-• Use /notspam for false positives
-• Use /reportspam for missed spam
-• Bot learns and improves automatically
-    """
+    stats_msg += "\n*How It Works:*\n"
+    stats_msg += "• Use /notspam for false positives\n"
+    stats_msg += "• Use /reportspam for missed spam\n"
+    stats_msg += "• Bot learns and improves automatically\n"
     
-    await update.message.reply_text(stats_msg, parse_mode='Markdown')
-
+    await update.message.reply_text(stats_msg, parse_mode='MarkdownV2')
 async def resetlearning_command(update: Update, context: ContextTypes.DEFAULT_TYPE, smart_learning):
     """Reset learning data"""
     if not await is_user_admin(update.effective_chat.id, update.effective_user.id, context):
