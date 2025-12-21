@@ -16,6 +16,9 @@ from models.spam_classifier import load_spam_model
 from systems.smart_learning import SmartLearning
 from systems.auto_ban import AutoBan
 
+# Import bot commands setup
+from utils.bot_commands import setup_bot_commands, setup_categorized_commands
+
 # Import handlers
 from handlers.commands import (
     start_command, help_command, stats_command, settings_command,
@@ -65,11 +68,9 @@ def print_startup_banner():
     print("  ✅ AI/ML Spam Detection")
     print("  ✅ URL/Link Blocking")
     print("  ✅ @Mention Blocking")
-    print("\n🚨 Commands:")
-    print("  /start - Bot information")
-    print("  /help - Full command list")
-    print("  /stats - View statistics")
-    print("  /strikes - Check strikes")
+    print("\n🎮 Commands Menu:")
+    print("  ✅ Telegram commands menu configured")
+    print("  💡 Type / in Telegram to see all commands")
     print("\nPress Ctrl+C to stop")
     print("="*60 + "\n")
 
@@ -151,6 +152,17 @@ def main():
     
     # Setup all handlers
     setup_handlers(app)
+    
+    # Setup bot commands menu
+    import asyncio
+    loop = asyncio.get_event_loop()
+    
+    # Choose setup method:
+    # Option 1: All commands (simple)
+    loop.run_until_complete(setup_bot_commands(app.bot, mode='all'))
+    
+    # Option 2: Categorized (groups vs private) - Uncomment to use
+    # loop.run_until_complete(setup_categorized_commands(app.bot))
     
     # Print startup banner
     print_startup_banner()
