@@ -52,6 +52,14 @@ WELCOME_COMMANDS = [
     BotCommand("resetwelcome", "🔄 Reset to default welcome"),
 ]
 
+# === Mass Tag Commands (Admin) ===
+MASS_TAG_COMMANDS = [
+    BotCommand("tagall", "👥 Tag all members"),
+    BotCommand("tagadmins", "👮 Tag only admins"),
+    BotCommand("tagonline", "🟢 Tag active members"),
+    BotCommand("tagstats", "📊 Group statistics"),
+]
+
 # === All Commands Combined ===
 ALL_COMMANDS = (
     BASIC_COMMANDS + 
@@ -59,7 +67,8 @@ ALL_COMMANDS = (
     SETTINGS_COMMANDS + 
     WHITELIST_COMMANDS + 
     BAN_COMMANDS + 
-    WELCOME_COMMANDS
+    WELCOME_COMMANDS +
+    MASS_TAG_COMMANDS
 )
 
 # === User-Only Commands (Non-Admin) ===
@@ -72,7 +81,8 @@ ADMIN_ONLY_COMMANDS = (
     SETTINGS_COMMANDS + 
     WHITELIST_COMMANDS + 
     BAN_COMMANDS + 
-    WELCOME_COMMANDS
+    WELCOME_COMMANDS +
+    MASS_TAG_COMMANDS
 )
 
 

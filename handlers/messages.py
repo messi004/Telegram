@@ -14,7 +14,10 @@ async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE, mode
     """Main message handler with spam detection"""
     if not update.message or not update.message.text:
         return
-
+    # Track active members for /tagonline command
+    from handlers.mass_tag import track_active_members
+    await track_active_members(update, context)
+  
     message_text = update.message.text
     chat_id = update.message.chat_id
     message_id = update.message.message_id

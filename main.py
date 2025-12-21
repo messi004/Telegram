@@ -19,6 +19,12 @@ from systems.auto_ban import AutoBan
 # Import bot commands setup
 from utils.bot_commands import setup_bot_commands, setup_categorized_commands
 
+# Import mass tags handlers
+from handlers.mass_tag import (
+    tag_all_command, tagall_admins_command, tagall_online_command,
+    tagall_stats_command, track_active_members
+)
+
 # Import handlers
 from handlers.commands import (
     start_command, help_command, stats_command, settings_command,
@@ -113,6 +119,12 @@ def setup_handlers(app):
     # Custom welcome commands
     app.add_handler(CommandHandler("customwelcome", customwelcome_command))
     app.add_handler(CommandHandler("resetwelcome", resetwelcome_command))
+    
+    # Mass Tag Commands
+    app.add_handler(CommandHandler("tagall", tag_all_command))
+    app.add_handler(CommandHandler("tagadmins", tagall_admins_command))
+    app.add_handler(CommandHandler("tagonline", tagall_online_command))
+    app.add_handler(CommandHandler("tagstats", tagall_stats_command))
     
     # Message handlers
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_new_member))
