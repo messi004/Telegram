@@ -24,12 +24,12 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# Directory setup
+# Folder and File Setup
 SESSION_DIR = "sessions"
 DATA_DIR = "data"
 SESSION_FILE = os.path.join(DATA_DIR, "user_sessions.pkl")
 
-# Ensure folders exist to avoid "unable to open database" error
+# Auto-create folders on startup
 os.makedirs(SESSION_DIR, exist_ok=True)
 os.makedirs(DATA_DIR, exist_ok=True)
 
@@ -51,7 +51,7 @@ def get_session_name(user_id: int, chat_id: int) -> str:
     return f"user_{user_id}_chat_{chat_id}"
 
 # ============================================
-# Pyrogram Scanner Logic
+# Pyrogram Scanner Core
 # ============================================
 
 async def pyrogram_scan_deleted_accounts(api_id, api_hash, session_name, chat_id, phone, progress_callback=None):
@@ -65,8 +65,12 @@ async def pyrogram_scan_deleted_accounts(api_id, api_hash, session_name, chat_id
                 results['total'] += 1
                 user = member.user
                 
-                # Check for deleted account
+                # Identify Deleted Accounts
+                is_deleted = False
                 if not user.first_name or user.first_name == "Deleted Account" or getattr(user, 'is_deleted', False):
+                    is_deleted = True
+                
+                if is_deleted:
                     results['deleted'] += 1
                     try:
                         await app.ban_chat_member(chat_id, user.id)
@@ -84,11 +88,11 @@ async def pyrogram_scan_deleted_accounts(api_id, api_hash, session_name, chat_id
         return {'error': str(e)}
 
 # ============================================
-# Handlers & Router
+# Logic Handlers (Phone, OTP, Password)
 # ============================================
 
 async def deleted_account_message_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Routes PM messages and stops them from triggering the Spam Model"""
+    """Sari incoming text messages ko monitor karta hai (Group Priority Fix)"""
     if update.effective_chat.type != "private":
         return
 
@@ -99,18 +103,23 @@ async def deleted_account_message_router(update: Update, context: ContextTypes.D
     elif context.user_data.get('awaiting_otp'):
         await handle_otp_code(update, context)
         is_handled = True
+    elif context.user_data.get('awaiting_password'):
+        await handle_password(update, context)
+        is_handled = True
 
     if is_handled:
-        # Stop this message from going to the Spam/ML model handlers
+        # Isse ye message Spam Model ke paas nahi jayega
         raise ApplicationHandlerStop()
 
 async def scan_deleted_accounts(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat, user = update.effective_chat, update.effective_user
     
-    # Check admin
-    member = await chat.get_member(user.id)
-    if member.status not in ['creator', 'administrator']:
-        return await update.message.reply_text("❌ Only admins can use this!")
+    # Admin verification
+    try:
+        member = await chat.get_member(user.id)
+        if member.status not in ['creator', 'administrator']:
+            return await update.message.reply_text("❌ Ye command sirf admins ke liye hai!")
+    except: return
 
     sessions = load_sessions()
     session_key = f"{user.id}_{chat.id}"
@@ -120,13 +129,13 @@ async def scan_deleted_accounts(update: Update, context: ContextTypes.DEFAULT_TY
         try:
             await context.bot.send_message(
                 chat_id=user.id,
-                text=f"Group **{chat.title}** ke liye setup.\n\nApna phone number bhejein (+countrycode):"
+                text=f"📌 **Group: {chat.title}**\nSetup ke liye apna phone number bhejein (+countrycode ke saath):"
             )
             context.user_data['awaiting_phone'] = True
             context.user_data['scan_chat_id'] = chat.id
             await update.message.reply_text("📱 Maine aapko Private Message bheja hai setup ke liye.")
         except:
-            await update.message.reply_text("❌ Pehle mujhe Private mein /start karein!")
+            await update.message.reply_text("❌ Pehle mujhe Private mein /start karein taaki main aapko message bhej saku!")
         return
 
     await start_scan(update, context, session_name, sessions[session_key])
@@ -155,41 +164,50 @@ async def handle_otp_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
     otp = update.message.text.strip()
     app = context.user_data.get('pyrogram_app')
     phone = context.user_data.get('phone')
+    phone_hash = context.user_data.get('phone_code_hash')
     
     try:
-        await app.sign_in(phone, context.user_data['phone_code_hash'], otp)
-        await app.disconnect()
-        
-        sessions = load_sessions()
-        sessions[f"{update.effective_user.id}_{context.user_data['scan_chat_id']}"] = phone
-        save_sessions(sessions)
-        
+        await app.sign_in(phone, phone_hash, otp)
+        await finalize_setup(update, context)
+    except SessionPasswordNeeded:
         context.user_data['awaiting_otp'] = False
-        await update.message.reply_text("✅ Setup successful! Ab group mein wapas jaakar `/scandeleted` likhein.")
+        context.user_data['awaiting_password'] = True
+        await update.message.reply_text("🔐 **2-Step Verification Password** bhejein:")
     except Exception as e:
         await update.message.reply_text(f"❌ OTP Error: {e}")
 
-async def start_scan(update: Update, context: ContextTypes.DEFAULT_TYPE, session_name, phone):
-    msg = await update.message.reply_text("🔍 **Scan starting...**\nThoda intezar karein.")
+async def handle_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    password = update.message.text.strip()
+    app = context.user_data.get('pyrogram_app')
+    try:
+        await app.check_password(password)
+        await finalize_setup(update, context)
+    except Exception as e:
+        await update.message.reply_text(f"❌ Password Galat: {e}\nDobara koshish karein:")
+
+async def finalize_setup(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    app = context.user_data.get('pyrogram_app')
+    await app.disconnect()
     
-    async def progress(m):
+    sessions = load_sessions()
+    sessions[f"{update.effective_user.id}_{context.user_data['scan_chat_id']}"] = context.user_data['phone']
+    save_sessions(sessions)
+    
+    context.user_data.update({'awaiting_otp': False, 'awaiting_password': False})
+    await update.message.reply_text("✅ Setup successful! Ab group mein `/scandeleted` likhein.")
+
+async def start_scan(update: Update, context: ContextTypes.DEFAULT_TYPE, session_name, phone):
+    msg = await update.message.reply_text("🔍 **Scan start ho raha hai...**")
+    async def prog(m):
         try: await msg.edit_text(f"🔍 **Scanning...**\n{m}")
         except: pass
 
-    res = await pyrogram_scan_deleted_accounts(
-        config.PYROGRAM_API_ID, config.PYROGRAM_API_HASH, 
-        session_name, update.effective_chat.id, phone, progress
-    )
+    res = await pyrogram_scan_deleted_accounts(config.PYROGRAM_API_ID, config.PYROGRAM_API_HASH, session_name, update.effective_chat.id, phone, prog)
     
     if 'error' in res:
         await msg.edit_text(f"❌ Scan failed: {res['error']}")
     else:
-        await msg.edit_text(
-            f"✅ **Scan Complete!**\n\n"
-            f"• Total Members: {res['total']}\n"
-            f"• Deleted Found: {res['deleted']}\n"
-            f"• Removed: {res['removed']}"
-        )
+        await msg.edit_text(f"✅ **Scan Complete!**\n\n• Members: {res['total']}\n• Deleted: {res['deleted']}\n• Removed: {res['removed']}")
 
 async def reset_session(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sessions = load_sessions()
@@ -197,13 +215,13 @@ async def reset_session(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if key in sessions:
         del sessions[key]
         save_sessions(sessions)
-        await update.message.reply_text("✅ Session reset success!")
+        await update.message.reply_text("✅ Session reset!")
 
 def register_deleted_account_handlers(app):
     app.add_handler(CommandHandler("scandeleted", scan_deleted_accounts))
     app.add_handler(CommandHandler("resetsession", reset_session))
     
-    # Priority group -1 ensures this runs BEFORE your ML spam model
+    # Priority group -1 ensures this blocks the ML spam model in Private chats
     app.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, 
         deleted_account_message_router
