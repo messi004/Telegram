@@ -3,7 +3,7 @@ import asyncio
 import os
 import pickle
 from typing import Optional
-
+import config
 from telegram import Update
 from telegram.ext import (
     ContextTypes, 
