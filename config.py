@@ -2,7 +2,8 @@
 Configuration file for Telegram Spam Bot
 """
 import os
-
+PYROGRAM_API_ID = 36972503
+PYROGRAM_API_HASH = "00f224a50c765561cefe10bbacaffa2f"
 # Bot Configuration
 BOT_TOKEN = "7813830750:AAEGBMmhwSZRN7ZWihphHmq1P6hdQofJGs8"
 

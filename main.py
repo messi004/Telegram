@@ -22,9 +22,7 @@ from handlers.mass_tag import (
 )
 
 # Import deleted account handlers
-from handlers.deleted_account_handler import (
-    scan_deleted_accounts, auto_remove_deleted, check_new_member
-)
+from handlers.deleted_account_handler import register_deleted_account_handlers
 
 # Import handlers
 from handlers.commands import (
@@ -101,10 +99,6 @@ def setup_handlers(app):
     app.add_handler(CommandHandler("tagonline", tagall_online_command))
     app.add_handler(CommandHandler("tagstats", tagall_stats_command))
     
-    # deleted account commands
-    app.add_handler(CommandHandler("scandeleted", scan_deleted_accounts))
-    app.add_handler(CommandHandler("autoremovedeleted", auto_remove_deleted))
-    
     # Message handlers
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_new_member))
     app.add_handler(MessageHandler(
@@ -146,7 +140,7 @@ def main():
     setup_handlers(app)
     
     # deleted account handlers
-    #register_deleted_account_handlers(application)
+    register_deleted_account_handlers(application)
        
     # Setup bot commands menu
     import asyncio

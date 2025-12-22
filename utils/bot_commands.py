@@ -62,9 +62,8 @@ MASS_TAG_COMMANDS = [
 
 # === delete accounts Commands (Admin) ===
 DELETE_ACCOUNTS_COMMANDS = [
-    BotCommand("scandeleted", "Manually scan karke deleted accounts remove kare"),
-    BotCommand("autoremovedeleted on", "Auto removal enable"),
-    BotCommand("autoremovedeleted off", "Auto removal disable"),
+    BotCommand("scandeleted", "deleted accounts removed"),
+    BotCommand("resetsession", "Session delete"),
 ]    
 
 # === All Commands Combined ===
