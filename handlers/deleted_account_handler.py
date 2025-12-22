@@ -5,21 +5,90 @@ import pickle
 from typing import Optional
 import config
 from telegram import Update
-from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters, ApplicationHandlerStop
+from telegram.ext import (
+    ContextTypes, 
+    CommandHandler, 
+    MessageHandler, 
+    filters,
+    ApplicationHandlerStop
+)
+from telegram.error import TelegramError
 
 # Pyrogram imports
 try:
     from pyrogram import Client
-    from pyrogram.errors import FloodWait
+    from pyrogram.errors import FloodWait, SessionPasswordNeeded
     PYROGRAM_AVAILABLE = True
 except ImportError:
     PYROGRAM_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
-# --- Message Router with Stop Signal ---
+# Directory setup
+SESSION_DIR = "sessions"
+DATA_DIR = "data"
+SESSION_FILE = os.path.join(DATA_DIR, "user_sessions.pkl")
+
+# Ensure folders exist to avoid "unable to open database" error
+os.makedirs(SESSION_DIR, exist_ok=True)
+os.makedirs(DATA_DIR, exist_ok=True)
+
+# ============================================
+# Session Management
+# ============================================
+
+def load_sessions():
+    if os.path.exists(SESSION_FILE):
+        try:
+            with open(SESSION_FILE, 'rb') as f: return pickle.load(f)
+        except: return {}
+    return {}
+
+def save_sessions(sessions):
+    with open(SESSION_FILE, 'wb') as f: pickle.dump(sessions, f)
+
+def get_session_name(user_id: int, chat_id: int) -> str:
+    return f"user_{user_id}_chat_{chat_id}"
+
+# ============================================
+# Pyrogram Scanner Logic
+# ============================================
+
+async def pyrogram_scan_deleted_accounts(api_id, api_hash, session_name, chat_id, phone, progress_callback=None):
+    if not PYROGRAM_AVAILABLE: return {'error': 'Pyrogram not installed'}
+    
+    results = {'total': 0, 'deleted': 0, 'removed': 0, 'errors': 0}
+    try:
+        app = Client(session_name, api_id=api_id, api_hash=api_hash, phone_number=phone, workdir=SESSION_DIR)
+        async with app:
+            async for member in app.get_chat_members(chat_id):
+                results['total'] += 1
+                user = member.user
+                
+                # Check for deleted account
+                if not user.first_name or user.first_name == "Deleted Account" or getattr(user, 'is_deleted', False):
+                    results['deleted'] += 1
+                    try:
+                        await app.ban_chat_member(chat_id, user.id)
+                        await app.unban_chat_member(chat_id, user.id)
+                        results['removed'] += 1
+                    except FloodWait as e:
+                        await asyncio.sleep(e.value)
+                    except Exception: results['errors'] += 1
+                
+                if results['total'] % 50 == 0 and progress_callback:
+                    await progress_callback(f"📊 Scanned: {results['total']} | Found: {results['deleted']}")
+                await asyncio.sleep(0.1)
+        return results
+    except Exception as e:
+        return {'error': str(e)}
+
+# ============================================
+# Handlers & Router
+# ============================================
+
 async def deleted_account_message_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Only process in Private Chat
+    """Routes PM messages and stops them from triggering the Spam Model"""
     if update.effective_chat.type != "private":
         return
 
@@ -31,31 +100,43 @@ async def deleted_account_message_router(update: Update, context: ContextTypes.D
         await handle_otp_code(update, context)
         is_handled = True
 
-    # AGAR MESSAGE HANDLE HO GAYA HAI, TOH ISSE SPAM MODEL TAK MAT BHEJO
     if is_handled:
+        # Stop this message from going to the Spam/ML model handlers
         raise ApplicationHandlerStop()
 
-# --- Updated Phone Handler with Database Fix ---
+async def scan_deleted_accounts(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat, user = update.effective_chat, update.effective_user
+    
+    # Check admin
+    member = await chat.get_member(user.id)
+    if member.status not in ['creator', 'administrator']:
+        return await update.message.reply_text("❌ Only admins can use this!")
+
+    sessions = load_sessions()
+    session_key = f"{user.id}_{chat.id}"
+    session_name = get_session_name(user.id, chat.id)
+
+    if session_key not in sessions:
+        try:
+            await context.bot.send_message(
+                chat_id=user.id,
+                text=f"Group **{chat.title}** ke liye setup.\n\nApna phone number bhejein (+countrycode):"
+            )
+            context.user_data['awaiting_phone'] = True
+            context.user_data['scan_chat_id'] = chat.id
+            await update.message.reply_text("📱 Maine aapko Private Message bheja hai setup ke liye.")
+        except:
+            await update.message.reply_text("❌ Pehle mujhe Private mein /start karein!")
+        return
+
+    await start_scan(update, context, session_name, sessions[session_key])
+
 async def handle_phone_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
     phone = update.message.text.strip()
-    if not phone.startswith('+'):
-        return await update.message.reply_text("❌ Galat format! +91... se start karein.")
-
-    user_id = update.effective_user.id
-    chat_id = context.user_data.get('scan_chat_id')
-    session_name = f"user_{user_id}_chat_{chat_id}"
+    session_name = get_session_name(update.effective_user.id, context.user_data['scan_chat_id'])
     
-    # Ensure directory exists
-    os.makedirs("sessions", exist_ok=True)
-
     try:
-        app = Client(
-            name=session_name,
-            api_id=config.PYROGRAM_API_ID,
-            api_hash=config.PYROGRAM_API_HASH,
-            phone_number=phone,
-            workdir="sessions" # Yahan sessions folder use ho raha hai
-        )
+        app = Client(session_name, config.PYROGRAM_API_ID, config.PYROGRAM_API_HASH, phone_number=phone, workdir=SESSION_DIR)
         await app.connect()
         sent_code = await app.send_code(phone)
         
@@ -66,19 +147,63 @@ async def handle_phone_number(update: Update, context: ContextTypes.DEFAULT_TYPE
             'awaiting_phone': False, 
             'awaiting_otp': True
         })
-        await update.message.reply_text("📨 Telegram app check karein aur OTP yahan bhejein:")
+        await update.message.reply_text("📨 Telegram se aaya hua OTP code yahan bhejein:")
     except Exception as e:
-        logger.error(f"Pyrogram Error: {e}")
-        await update.message.reply_text(f"❌ Error: {e}\nTip: 'sessions' folder check karein.")
+        await update.message.reply_text(f"❌ Error: {e}")
 
-# --- Registration Update ---
+async def handle_otp_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    otp = update.message.text.strip()
+    app = context.user_data.get('pyrogram_app')
+    phone = context.user_data.get('phone')
+    
+    try:
+        await app.sign_in(phone, context.user_data['phone_code_hash'], otp)
+        await app.disconnect()
+        
+        sessions = load_sessions()
+        sessions[f"{update.effective_user.id}_{context.user_data['scan_chat_id']}"] = phone
+        save_sessions(sessions)
+        
+        context.user_data['awaiting_otp'] = False
+        await update.message.reply_text("✅ Setup successful! Ab group mein wapas jaakar `/scandeleted` likhein.")
+    except Exception as e:
+        await update.message.reply_text(f"❌ OTP Error: {e}")
+
+async def start_scan(update: Update, context: ContextTypes.DEFAULT_TYPE, session_name, phone):
+    msg = await update.message.reply_text("🔍 **Scan starting...**\nThoda intezar karein.")
+    
+    async def progress(m):
+        try: await msg.edit_text(f"🔍 **Scanning...**\n{m}")
+        except: pass
+
+    res = await pyrogram_scan_deleted_accounts(
+        config.PYROGRAM_API_ID, config.PYROGRAM_API_HASH, 
+        session_name, update.effective_chat.id, phone, progress
+    )
+    
+    if 'error' in res:
+        await msg.edit_text(f"❌ Scan failed: {res['error']}")
+    else:
+        await msg.edit_text(
+            f"✅ **Scan Complete!**\n\n"
+            f"• Total Members: {res['total']}\n"
+            f"• Deleted Found: {res['deleted']}\n"
+            f"• Removed: {res['removed']}"
+        )
+
+async def reset_session(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    sessions = load_sessions()
+    key = f"{update.effective_user.id}_{update.effective_chat.id}"
+    if key in sessions:
+        del sessions[key]
+        save_sessions(sessions)
+        await update.message.reply_text("✅ Session reset success!")
+
 def register_deleted_account_handlers(app):
-    app.bot_data['PYROGRAM_API_ID'] = config.PYROGRAM_API_ID
-    app.bot_data['PYROGRAM_API_HASH'] = config.PYROGRAM_API_HASH
-    
     app.add_handler(CommandHandler("scandeleted", scan_deleted_accounts))
+    app.add_handler(CommandHandler("resetsession", reset_session))
     
-    # Group -1 ensures it runs before the Spam Model
+    # Priority group -1 ensures this runs BEFORE your ML spam model
     app.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, 
         deleted_account_message_router
