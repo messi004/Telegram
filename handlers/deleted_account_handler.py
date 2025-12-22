@@ -1,8 +1,3 @@
-"""
-Hybrid Deleted Account Remover - Telegram Bot + Pyrogram
-Complete member list scan with session management
-"""
-
 import logging
 import asyncio
 import os
@@ -479,132 +474,25 @@ async def reset_session(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Handler Registration
 # ============================================
 
-def register_deleted_account_handlers(application):
+def register_deleted_account_handlers(app):
     """Register all handlers"""
     
     # Store API credentials from config
     from config import PYROGRAM_API_ID, PYROGRAM_API_HASH
-    application.bot_data['PYROGRAM_API_ID'] = PYROGRAM_API_ID
-    application.bot_data['PYROGRAM_API_HASH'] = PYROGRAM_API_HASH
+    app.bot_data['PYROGRAM_API_ID'] = PYROGRAM_API_ID
+    app.bot_data['PYROGRAM_API_HASH'] = PYROGRAM_API_HASH
     
     # Commands
-    application.add_handler(CommandHandler("scandeleted", scan_deleted_accounts))
-    application.add_handler(CommandHandler("resetsession", reset_session))
+    app.add_handler(CommandHandler("scandeleted", scan_deleted_accounts))
+    app.add_handler(CommandHandler("resetsession", reset_session))
     
     # Message handlers for phone/OTP
-    application.add_handler(MessageHandler(
+    app.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE,
         handle_phone_number
     ))
     
-    application.add_handler(MessageHandler(
+    app.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE,
         handle_otp_code
     ))
-
-
-"""
-=== INSTALLATION GUIDE ===
-
-**Step 1: Install Dependencies**
-```bash
-pip install pyrogram tgcrypto
-```
-
-**Step 2: Get API Credentials**
-1. https://my.telegram.org par jao
-2. Login karo
-3. API Development Tools > Create Application
-4. API ID aur API Hash copy karo
-
-**Step 3: Update config.py**
-```python
-# config.py
-
-# Existing config...
-BOT_TOKEN = "your_bot_token"
-
-# Add these lines:
-PYROGRAM_API_ID = 12345678  # Your API ID
-PYROGRAM_API_HASH = "your_api_hash_here"  # Your API Hash
-```
-
-**Step 4: Save This File**
-Save as: `handlers/deleted_account_handler.py`
-
-**Step 5: Update main.py**
-```python
-from handlers.deleted_account_handler import register_deleted_account_handlers
-
-def main():
-    application = Application.builder().token(BOT_TOKEN).build()
-    
-    # ... existing handlers ...
-    
-    # Add this line
-    register_deleted_account_handlers(application)
-    
-    application.run_polling()
-```
-
-**Step 6: Create sessions directory**
-```bash
-mkdir sessions
-mkdir data
-```
-
-=== USAGE ===
-
-**First Time (in group):**
-1. Admin: /scandeleted
-2. Bot: "Phone number bhejo"
-3. Admin (in PM to bot): +919876543210
-4. Bot: "OTP bhejo"
-5. Admin (in PM): 12345
-6. Bot: Session created! Starting scan...
-7. ✅ Scan complete with results!
-
-**Next Time:**
-1. Admin: /scandeleted
-2. Bot: Automatically starts scan (no phone/OTP needed)!
-
-**Reset Session:**
-/resetsession - Session delete karke naya setup
-
-=== FEATURES ===
-
-✅ **Hybrid Architecture**: Bot + Pyrogram combined
-✅ **One-time Setup**: Phone/OTP sirf ek baar
-✅ **Session Management**: Automatically saved
-✅ **Complete Scan**: Sare members (no limitations!)
-✅ **Progress Updates**: Real-time scan status
-✅ **Error Handling**: Proper error messages
-✅ **Rate Limit Handling**: FloodWait auto-handled
-✅ **Private Setup**: Phone/OTP via PM only
-✅ **Multi-Group**: Har group ke liye alag session
-
-=== SECURITY ===
-
-🔒 **Safe & Secure:**
-- Sessions encrypted by Pyrogram
-- Phone/OTP via private message only
-- Admin-only access
-- Credentials in config file (not hardcoded)
-- Sessions stored safely
-
-=== NOTES ===
-
-⚠️ Important:
-- Bot restart karne par sessions safe rahenge
-- Har admin ka alag session hoga
-- Phone number sirf ek baar chahiye
-- OTP verification automatic hai
-
-💡 Tips:
-- Test pehle small group mein
-- Large groups mein time lagega (rate limits)
-- Session reset karne ke liye /resetsession use karo
-
-🎯 Result:
-Complete member list scan ho jayega aur sare deleted accounts remove!
-"""

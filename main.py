@@ -136,12 +136,12 @@ def main():
     # Create application
     app = Application.builder().token(config.BOT_TOKEN).build()
     
+    # deleted account handlers
+    register_deleted_account_handlers(app)
+       
     # Setup all handlers
     setup_handlers(app)
     
-    # deleted account handlers
-    register_deleted_account_handlers(application)
-       
     # Setup bot commands menu
     import asyncio
     loop = asyncio.get_event_loop()
