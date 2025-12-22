@@ -15,10 +15,10 @@ try:
     TELETHON_AVAILABLE = True
 except ImportError:
     TELETHON_AVAILABLE = False
-    print("⚠️ Telethon not installed. Install with: pip install telethon")
 
 logger = logging.getLogger(__name__)
 
+# Config
 SESSION_DIR = "sessions"
 DATA_DIR = "data"
 SESSION_FILE = os.path.join(DATA_DIR, "user_sessions.pkl")
@@ -27,7 +27,7 @@ os.makedirs(SESSION_DIR, exist_ok=True)
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # ============================================
-# Session Management
+# Helpers
 # ============================================
 
 def load_sessions():
@@ -41,7 +41,8 @@ def save_sessions(sessions):
     with open(SESSION_FILE, 'wb') as f: pickle.dump(sessions, f)
 
 def get_session_path(user_id, chat_id):
-    return os.path.join(SESSION_DIR, f"tele_user_{user_id}_{chat_id}")
+    # Aapke Colab method ki tarah simple path
+    return os.path.join(SESSION_DIR, f"tele_{user_id}_{chat_id}")
 
 async def cleanup_client(context: ContextTypes.DEFAULT_TYPE):
     client = context.user_data.get('tele_client')
@@ -51,33 +52,42 @@ async def cleanup_client(context: ContextTypes.DEFAULT_TYPE):
     context.user_data.pop('tele_client', None)
 
 # ============================================
-# Telethon Scanner Logic
+# Core Scanner (Stable iter_participants)
 # ============================================
 
 async def telethon_scan_deleted_accounts(api_id, api_hash, session_path, chat_id, progress_callback=None):
     results = {'total': 0, 'deleted': 0, 'removed': 0, 'errors': 0}
-    client = TelegramClient(session_path, api_id, api_hash)
+    
+    # Trusted Device Config (Colab Style)
+    client = TelegramClient(
+        session_path, api_id, api_hash,
+        device_model="Android 14",
+        system_version="4.16.30-vh+",
+        app_version="10.5.0"
+    )
     
     try:
         await client.connect()
+        # Direct iteration like your Colab script
         async for user in client.iter_participants(chat_id):
             results['total'] += 1
             if user.deleted:
                 results['deleted'] += 1
                 try:
-                    # Kicking deleted accounts
+                    # Kicking logic
                     await client.edit_permissions(chat_id, user.id, view_messages=False)
                     results['removed'] += 1
                 except: results['errors'] += 1
             
             if results['total'] % 50 == 0 and progress_callback:
                 await progress_callback(f"📊 Scanned: {results['total']} | Deleted: {results['deleted']}")
+            await asyncio.sleep(0.1) # Flood prevention
         return results
     finally:
         await client.disconnect()
 
 # ============================================
-# Handlers
+# Handler Logic
 # ============================================
 
 async def deleted_account_message_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -102,12 +112,12 @@ async def scan_deleted_accounts(update: Update, context: ContextTypes.DEFAULT_TY
     session_key = f"{user.id}_{chat.id}"
     session_path = get_session_path(user.id, chat.id)
 
-    if session_key not in sessions:
-        await context.bot.send_message(chat_id=user.id, text=f"📌 Setup for **{chat.title}**\nSend phone number (+countrycode):")
+    # Check if session exists (Manual upload from Colab)
+    if os.path.exists(f"{session_path}.session") or session_key in sessions:
+        await start_scan(update, context, session_path)
+    else:
+        await context.bot.send_message(chat_id=user.id, text=f"📌 Setup for **{chat.title}**\nPhone number bhejein:")
         context.user_data.update({'awaiting_phone': True, 'scan_chat_id': chat.id})
-        return
-
-    await start_scan(update, context, session_path)
 
 async def handle_phone_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
     phone = update.message.text.strip()
@@ -118,14 +128,14 @@ async def handle_phone_number(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     try:
         await client.connect()
-        # Requesting code
+        # Requesting code like your script
         sent = await client.send_code_request(phone)
         context.user_data.update({
             'tele_client': client, 'phone': phone, 
             'phone_hash': sent.phone_code_hash,
             'awaiting_phone': False, 'awaiting_otp': True
         })
-        await update.message.reply_text("📨 Enter OTP code:")
+        await update.message.reply_text("📨 OTP code bhejein:")
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {e}")
 
@@ -138,9 +148,9 @@ async def handle_otp_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await finalize_setup(update, context)
     except SessionPasswordNeededError:
         context.user_data.update({'awaiting_otp': False, 'awaiting_password': True})
-        await update.message.reply_text("🔐 2FA Password required:")
-    except PhoneCodeExpiredError:
-        await update.message.reply_text("❌ OTP Expired! Send number again:")
+        await update.message.reply_text("🔐 2-Step Password bhejein:")
+    except (PhoneCodeExpiredError, PhoneCodeInvalidError):
+        await update.message.reply_text("❌ OTP Expired ya Invalid. Number dobara bhejein:")
         context.user_data['awaiting_phone'] = True
     except Exception as e:
         await update.message.reply_text(f"❌ OTP Error: {e}")
@@ -160,16 +170,16 @@ async def finalize_setup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sessions[f"{update.effective_user.id}_{context.user_data['scan_chat_id']}"] = context.user_data['phone']
     save_sessions(sessions)
     context.user_data.update({'awaiting_otp': False, 'awaiting_password': False})
-    await update.message.reply_text("✅ Setup done! Run /scandeleted in group.")
+    await update.message.reply_text("✅ Setup done! Ab group mein `/scandeleted` run karein.")
 
 async def start_scan(update: Update, context: ContextTypes.DEFAULT_TYPE, session_path):
-    msg = await update.message.reply_text("🔍 Scanning with Telethon...")
+    msg = await update.message.reply_text("🔍 Scanning participants...")
     async def prog(m): 
         try: await msg.edit_text(f"🔍 {m}")
         except: pass
     
     res = await telethon_scan_deleted_accounts(config.PYROGRAM_API_ID, config.PYROGRAM_API_HASH, session_path, update.effective_chat.id, prog)
-    await msg.edit_text(f"✅ **Scan Done!**\nTotal: {res['total']}\nDeleted: {res['deleted']}\nRemoved: {res['removed']}")
+    await msg.edit_text(f"✅ **Scan Done!**\n\nTotal: {res['total']}\nDeleted: {res['deleted']}\nRemoved: {res['removed']}")
 
 def register_deleted_account_handlers(app):
     app.add_handler(CommandHandler("scandeleted", scan_deleted_accounts))
