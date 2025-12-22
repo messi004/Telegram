@@ -83,7 +83,7 @@ async def tag_all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def send_mass_tag_message(update, context, members, custom_message):
     """Send message with member tags in batches"""
     # Telegram limit: 4096 characters per message
-    MAX_TAGS_PER_MESSAGE = 50  # Approximately 50 tags per message
+    MAX_TAGS_PER_MESSAGE = 20  # Approximately 20 tags per message
     
     total_members = len(members)
     batches = [members[i:i + MAX_TAGS_PER_MESSAGE] for i in range(0, len(members), MAX_TAGS_PER_MESSAGE)]
@@ -116,7 +116,7 @@ async def send_mass_tag_message(update, context, members, custom_message):
             
             # Add delay between batches to avoid flood limits
             if batch_num < len(batches):
-                await asyncio.sleep(1)
+                await asyncio.sleep(2)
         except Exception as e:
             print(f"Error sending batch {batch_num}: {e}")
 

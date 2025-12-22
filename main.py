@@ -1,7 +1,3 @@
-"""
-Telegram Spam Detector Bot - Main Entry Point
-Professional Industry Standard Architecture
-"""
 import nest_asyncio
 from telegram import Update
 from telegram.ext import Application, MessageHandler, CommandHandler, filters, ChatMemberHandler
@@ -24,6 +20,9 @@ from handlers.mass_tag import (
     tag_all_command, tagall_admins_command, tagall_online_command,
     tagall_stats_command, track_active_members
 )
+
+# Import deleted account handlers
+from handlers.deleted_account_handler import register_deleted_account_handlers
 
 # Import handlers
 from handlers.commands import (
@@ -51,32 +50,6 @@ vectorizer = None
 def print_startup_banner():
     """Print bot startup information"""
     print("\n" + "="*60)
-    print("✓ Ultra Advanced Spam Detector Bot Running!")
-    print("="*60)
-    print("\n🆕 AUTO-BAN SYSTEM:")
-    print(f"  🚨 {auto_ban.strike_limit}-Strike Rule Active")
-    print(f"  ⏰ Strikes reset after {auto_ban.reset_interval_hours} hours")
-    print("  ⛔ Automatic permanent ban")
-    print(f"  📊 {len(auto_ban.banned_users)} users currently banned")
-    print(f"  📊 {len(auto_ban.user_strikes)} users with active strikes")
-    print("\n🧠 SMART LEARNING SYSTEM:")
-    print("  🔄 Auto-updates spam patterns")
-    print("  📈 Improves detection over time")
-    print(f"  📊 {len(smart_learning.learned_spam_patterns)} spam patterns")
-    print(f"  📊 {len(smart_learning.learned_safe_patterns)} safe patterns")
-    print("\n📋 ALL FEATURES:")
-    print("  ✅ Auto-Ban System (3-Strike)")
-    print("  ✅ Smart Learning System")
-    print("  ✅ Whitelist (Admins auto)")
-    print("  ✅ Custom Welcome Messages")
-    print("  ✅ Image/Sticker Detection")
-    print("  ✅ Multi-Language (EN/HI/TA)")
-    print("  ✅ AI/ML Spam Detection")
-    print("  ✅ URL/Link Blocking")
-    print("  ✅ @Mention Blocking")
-    print("\n🎮 Commands Menu:")
-    print("  ✅ Telegram commands menu configured")
-    print("  💡 Type / in Telegram to see all commands")
     print("\nPress Ctrl+C to stop")
     print("="*60 + "\n")
 
@@ -126,6 +99,10 @@ def setup_handlers(app):
     app.add_handler(CommandHandler("tagonline", tagall_online_command))
     app.add_handler(CommandHandler("tagstats", tagall_stats_command))
     
+    # deleted account commands
+    app.add_handler(CommandHandler("scandeleted", scan_deleted_accounts))
+    app.add_handler(CommandHandler("autoremovedeleted", auto_remove_deleted))
+    
     # Message handlers
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_new_member))
     app.add_handler(MessageHandler(
@@ -158,6 +135,7 @@ def main():
         print("\n⚠️ ERROR: Please set your bot token in config.py!")
         print("Get token from @BotFather on Telegram")
         return
+        
     
     # Create application
     app = Application.builder().token(config.BOT_TOKEN).build()
@@ -165,6 +143,9 @@ def main():
     # Setup all handlers
     setup_handlers(app)
     
+    # deleted account handlers
+    #register_deleted_account_handlers(application)
+       
     # Setup bot commands menu
     import asyncio
     loop = asyncio.get_event_loop()

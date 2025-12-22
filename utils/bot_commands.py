@@ -60,6 +60,13 @@ MASS_TAG_COMMANDS = [
     BotCommand("tagstats", "📊 Group statistics"),
 ]
 
+# === delete accounts Commands (Admin) ===
+DELETE_ACCOUNTS_COMMANDS = [
+    BotCommand("scandeleted", "Manually scan karke deleted accounts remove kare"),
+    BotCommand("autoremovedeleted on", "Auto removal enable"),
+    BotCommand("autoremovedeleted off", "Auto removal disable"),
+]    
+
 # === All Commands Combined ===
 ALL_COMMANDS = (
     BASIC_COMMANDS + 
@@ -68,7 +75,8 @@ ALL_COMMANDS = (
     WHITELIST_COMMANDS + 
     BAN_COMMANDS + 
     WELCOME_COMMANDS +
-    MASS_TAG_COMMANDS
+    MASS_TAG_COMMANDS +
+    DELETE_ACCOUNTS_COMMANDS
 )
 
 # === User-Only Commands (Non-Admin) ===
@@ -82,7 +90,9 @@ ADMIN_ONLY_COMMANDS = (
     WHITELIST_COMMANDS + 
     BAN_COMMANDS + 
     WELCOME_COMMANDS +
-    MASS_TAG_COMMANDS
+    MASS_TAG_COMMANDS +
+    DELETE_ACCOUNTS_COMMANDS
+    
 )
 
 
