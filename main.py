@@ -22,7 +22,9 @@ from handlers.mass_tag import (
 )
 
 # Import deleted account handlers
-from handlers.deleted_account_handler import register_deleted_account_handlers
+from handlers.deleted_account_handler import (
+    scan_deleted_accounts, auto_remove_deleted, check_new_member
+)
 
 # Import handlers
 from handlers.commands import (
