@@ -23,17 +23,15 @@ EXPLICIT_KEYWORDS = {
     'tamil': [
         'பெண்', 'சேவை', 'கால்', 'செய்தி', 'பணம்', 'இலவசம்',
         'pen', 'sevai', 'call', 'seythi', 'panam', 'ilavasam'
-    ]
-}    
-  """  ,
+    ],
     'patterns': [
         r'\d+\s*(₹|rs|rupees)',
         r'(₹|rs)\s*\d+',
-        r'(.)\1{4,}',
-        r'(dm|msg|message|call)\s*(me|karo|here)',
+        r'(.)\1{5,}',
+        #r'(dm|msg|message|call)\s*(me|karo|here)',
     ]
 }
-"""
+
 SEVERE_KEYWORDS = [
     'child', 'minor', 'underage', 'kid', 'cp', 'child porn',
     'school girl', 'college girl', 'hostel girl', 'young girl',
