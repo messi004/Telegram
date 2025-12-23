@@ -4,7 +4,13 @@ import os
 import pickle
 import config
 from telegram import Update
-from telegram.ext import ContextTypes, ApplicationHandlerStop
+from telegram.ext import (
+    ContextTypes, 
+    CommandHandler, 
+    MessageHandler, 
+    filters, 
+    ApplicationHandlerStop
+)
 
 # Telethon imports
 try:
@@ -388,22 +394,21 @@ async def mysessions_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user = update.effective_user
     
     sessions = DeletedAccountsSession.load_sessions()
-    user_sessions = []
     
-    for key, data in sessions.items():
-        if key.startswith(f"{user.id}_"):
-            user_sessions.append((key, data))
-    
-    if not user_sessions:
+    if not sessions:
         await update.message.reply_text("No sessions found.")
         return
     
     message = "📋 **Your Sessions:**\n\n"
     
-    for key, data in user_sessions.items():
-        user_id, chat_id = key.split('_')
-        phone = data.get('phone', 'Unknown')
-        message += f"• Chat ID: {chat_id}\n  Phone: {phone}\n\n"
+    for key, data in sessions.items():
+        if key.startswith(f"{user.id}_"):
+            user_id, chat_id = key.split('_')
+            phone = data.get('phone', 'Unknown')
+            message += f"• Chat ID: {chat_id}\n  Phone: {phone}\n\n"
+    
+    if message == "📋 **Your Sessions:**\n\n":
+        message = "No sessions found for you."
     
     await update.message.reply_text(message, parse_mode='Markdown')
 
