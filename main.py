@@ -2,11 +2,7 @@ import logging
 import nest_asyncio
 from telegram import Update
 from telegram.ext import Application, MessageHandler, CommandHandler, filters, ChatMemberHandler
-# Setup logging
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
+
 # Import configuration
 import config
 
