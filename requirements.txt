@@ -1,9 +1,10 @@
-# Core Dependencies
 python-telegram-bot==21.0
 torch==2.1.0
 scikit-learn==1.3.0
 nest-asyncio==1.5.8
 telethon==1.34.0
+ucimlrepo
+pandas
 
 # Optional (for better performance)
 numpy==1.24.3
