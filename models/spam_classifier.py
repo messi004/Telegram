@@ -162,7 +162,7 @@ def train_and_save_model():
         print("Falling back to original hard-coded data.")
         # ... (revert to your original hard-coded messages and labels here)
         messages = ['Congratulations! You won...', ...]
-        labels = [1, 1, ... 0, 0]
+        labels = [1, 1, ..., 0, 0]
 
     # Step 2: Preprocess Text
     print("Preprocessing text...")
