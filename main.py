@@ -1,7 +1,12 @@
+import logging
 import nest_asyncio
 from telegram import Update
 from telegram.ext import Application, MessageHandler, CommandHandler, filters, ChatMemberHandler
-
+# Setup logging
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 # Import configuration
 import config
 
@@ -22,8 +27,11 @@ from handlers.mass_tag import (
 )
 
 # Import deleted account handlers
-from handlers.deleted_account_handler import register_deleted_account_handlers
-
+from handlers.deleted_accounts import (
+    register_deleted_accounts_handlers,
+    mysessions_command,
+    clearsession_command
+)
 # Import handlers
 from handlers.commands import (
     start_command, help_command, stats_command, settings_command,
@@ -126,18 +134,19 @@ def main():
     model, vectorizer = load_spam_model()
     print("✓ Model loaded!")
     
-    # Validate bot token
-    if config.BOT_TOKEN == "YOUR_BOT_TOKEN_HERE":
-        print("\n⚠️ ERROR: Please set your bot token in config.py!")
-        print("Get token from @BotFather on Telegram")
-        return
-        
-    
     # Create application
     app = Application.builder().token(config.BOT_TOKEN).build()
     
     # deleted account handlers
-    register_deleted_account_handlers(app)
+    register_deleted_accounts_handlers(
+        app,
+        api_id=config.API_ID,
+        api_hash=config.API_HASH
+    )
+    
+    # Register shared utility commands
+    app.add_handler(CommandHandler("mysessions", mysessions_command))
+    app.add_handler(CommandHandler("clearsession", clearsession_command))
        
     # Setup all handlers
     setup_handlers(app)
