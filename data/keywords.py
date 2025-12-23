@@ -25,8 +25,8 @@ EXPLICIT_KEYWORDS = {
         'pen', 'sevai', 'call', 'seythi', 'panam', 'ilavasam'
     ],
     'patterns': [
-        r'\d+\s*(₹|rs|rupees)',
-        r'(₹|rs)\s*\d+',
+        #r'\d+\s*(₹|rs|rupees)',
+        #r'(₹|rs)\s*\d+',
         r'(.)\1{5,}',
         #r'(dm|msg|message|call)\s*(me|karo|here)',
     ]

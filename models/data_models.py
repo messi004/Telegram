@@ -108,7 +108,7 @@ class BotSettings:
     welcome_enabled: bool = True
     url_blocking: bool = True
     mention_blocking: bool = True
-    tag_blocking: bool = True
+    tag_blocking: bool = False
     sticker_blocking: bool = True
     threshold: float = 0.5
     

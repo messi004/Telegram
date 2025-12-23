@@ -1,7 +1,7 @@
 import os
 # Bot Config
-API_ID = 36972503
-API_HASH = "00f224a50c765561cefe10bbacaffa2f"
+API_ID = 31174995
+API_HASH = "10a5c536d8fe8346566ad2b00b3839d0"
 BOT_TOKEN = "7813830750:AAEGBMmhwSZRN7ZWihphHmq1P6hdQofJGs8"
 
 # Device Configuration
